@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tabiat Hodisalari 3D - Ultra Realistik Simulyator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    * {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #020617;
+    }
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    .ultra-panel {
+      background: rgba(10, 16, 30, 0.75);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+    .disaster-card {
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .disaster-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(56, 189, 248, 0.4);
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .disaster-card.active {
+      border-color: #38bdf8;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(99, 102, 241, 0.2));
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.4), inset 0 0 10px rgba(56, 189, 248, 0.2);
+    }
+    .vignette-overlay {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      background: radial-gradient(circle at center, transparent 55%, rgba(2, 6, 23, 0.8) 100%);
+    }
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="text-slate-100 overflow-hidden">
+  <canvas id="webgl-canvas"></canvas>
+  <div class="vignette-overlay"></div>
+
+  <header class="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+    <div class="ultra-panel pointer-events-auto px-4 py-2.5 rounded-2xl flex items-center gap-4">
+      <div class="flex items-center gap-2.5">
+        <div class="relative flex items-center justify-center">
+          <span class="w-3 h-3 rounded-full bg-cyan-400"></span>
+          <span class="absolute w-5 h-5 rounded-full bg-cyan-400/40 animate-ping"></span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-[10px] tracking-widest text-cyan-400 font-bold uppercase font-mono">Ultra HD v3.0 • Realistik</h1>
+            <span class="px-1.5 py-0.2 text-[9px] bg-white/10 rounded font-mono text-emerald-400 border border-emerald-400/30">PBR + Bloom</span>
+          </div>
+          <p class="text-sm font-bold text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-mountain-sun text-cyan-400"></i> Orol Biosferasi va Ofatlar
+          </p>
+        </div>
+      </div>
+      <div class="h-8 w-px bg-white/10 hidden sm:block"></div>
+      <div class="min-w-[130px] sm:min-w-[160px]">
+        <div class="flex justify-between text-xs font-semibold mb-1">
+          <span class="text-slate-300">Biosfera Butunligi</span>
+          <span id="health-val" class="text-cyan-400 font-mono">100%</span>
+        </div>
+        <div class="w-full bg-slate-900/80 rounded-full h-2 overflow-hidden border border-white/10 p-0.5">
+          <div id="health-bar" class="bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 h-full rounded-full transition-all duration-300 w-full shadow-[0_0_10px_#22d3ee]"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sky Presets & Orbit Tools -->
+    <div class="ultra-panel pointer-events-auto px-3 py-2 rounded-2xl flex items-center gap-2">
+      <div class="flex bg-slate-900/60 p-1 rounded-xl border border-white/10 gap-1">
+        <button id="preset-day" class="px-2.5 py-1 text-xs rounded-lg bg-cyan-500/30 text-cyan-300 font-semibold transition" title="Kunduzgi yorug'lik">
+          <i class="fa-solid fa-sun mr-1 text-amber-300"></i>Kun
+        </button>
+        <button id="preset-sunset" class="px-2.5 py-1 text-xs rounded-lg text-slate-300 hover:text-white transition" title="Oltin ufq / Shom">
+          <i class="fa-solid fa-cloud-sun mr-1 text-orange-400"></i>Shom
+        </button>
+        <button id="preset-night" class="px-2.5 py-1 text-xs rounded-lg text-slate-300 hover:text-white transition" title="Tungi kinematik">
+          <i class="fa-solid fa-moon mr-1 text-indigo-300"></i>Tun
+        </button>
+      </div>
+
+      <button id="btn-cinematic" title="Kinematik aylanish rejimi" class="p-2 px-3 rounded-xl hover:bg-white/10 text-cyan-400 border border-white/10 transition text-xs flex items-center gap-1.5 font-medium">
+        <i class="fa-solid fa-video text-xs"></i>
+        <span class="hidden md:inline">Kamera</span>
+      </button>
+
+      <button id="btn-audio" title="Sintezlangan ovozlar" class="p-2 px-3 rounded-xl hover:bg-white/10 text-sky-400 border border-white/10 transition text-xs flex items-center gap-1.5 font-medium">
+        <i id="audio-icon" class="fa-solid fa-volume-high text-xs"></i>
+        <span class="hidden md:inline">Ovoz</span>
+      </button>
+
+      <button id="btn-reset" title="Hammasini qayta tiklash" class="p-2 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 transition text-xs flex items-center gap-1.5 font-semibold">
+        <i class="fa-solid fa-rotate-right text-xs"></i>
+        <span class="hidden md:inline">Tiklash</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Sidebar Disaster Controls -->
+  <aside class="absolute left-4 top-24 bottom-6 w-84 max-w-[calc(100vw-2rem)] ultra-panel rounded-3xl p-4 flex flex-col z-20 pointer-events-auto shadow-2xl">
+    <div class="flex items-center justify-between pb-3 border-b border-white/10">
+      <div class="flex items-center gap-2.5">
+        <div class="p-2 bg-gradient-to-tr from-cyan-500 to-indigo-600 rounded-xl shadow-[0_0_15px_rgba(56,189,248,0.4)]">
+          <i class="fa-solid fa-fire-flame-curved text-white text-sm"></i>
+        </div>
+        <div>
+          <h2 class="font-bold text-sm leading-tight text-white flex items-center gap-1.5">
+            Elementar Kuchlar <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">HDR</span>
+          </h2>
+          <p class="text-[11px] text-slate-400">9 ta realistik tabiiy ofat</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disaster Intensity Engine -->
+    <div class="my-3 p-3 bg-slate-900/70 rounded-2xl border border-white/10">
+      <div class="flex justify-between items-center text-xs mb-1.5 font-medium">
+        <span class="text-slate-300 flex items-center gap-1.5 text-[11px]">
+          <i class="fa-solid fa-sliders text-cyan-400"></i> Quvvat & Tezlik
+        </span>
+        <span id="intensity-badge" class="text-cyan-400 font-bold font-mono text-xs">1.0x</span>
+      </div>
+      <input id="intensity-slider" type="range" min="0.5" max="3" step="0.1" value="1.0" 
+        class="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer">
+    </div>
+
+    <!-- Disaster Cards -->
+    <div class="flex-1 overflow-y-auto pr-1 space-y-2 mt-1">
+      <button id="toggle-rain" class="disaster-card w-full p-2.5 rounded-2xl border border-white/10 bg-slate-800/40 flex items-center justify-between text-left">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-base border border-blue-400/20">
+            <i class="fa-solid fa-cloud-showers-heavy"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-white">Yomg'ir & Tomchilar</div>
+            <div class="text-[10px] text-slate-400">Suv sachrashlari va namlik</div>
+          </div>
+        </div>
+        <span class="status-indicator w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"></span>
+      </button>
+
+      <button id="toggle-hail" class="disaster-card w-full p-2.5 rounded-2xl border border-white/10 bg-slate-800/40 flex items-center justify-between text-left">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center text-base border border-teal-400/20">
+            <i class="fa-solid fa-icicles"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-white">Do'l Bo'roni</div>
+            <div class="text-[10px] text-slate-400">Muz toshlari va zarbalar</div>
+          </div>
+        </div>
+        <span class="status-indicator w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"></span>
+      </button>
+
+      <button id="toggle-lightning" class="disaster-card w-full p-2.5 rounded-2xl border border-white/10 bg-slate-800/40 flex items-center justify-between text-left">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center text-base border border-amber-400/20">
+            <i class="fa-solid fa-bolt-lightning"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-white">Chaqmoq & Guldurak</div>
+            <div class="text-[10px] text-slate-400">Real tarmoqlanish va momaqaldiroq</div>
+          </div>
+        </div>
+        <span class="status-indicator w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"></span>
+      </button>
+
+      <button id="toggle-rainbow" class="disaster-card w-full p-2.5 rounded-2xl border border-white/10 bg-slate-800/40 flex items-center justify-between text-left">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500/20 via-purple-500/20 to-cyan-500/20 text-fuchsia-300 flex items-center justify-center text-base border border-fuchsia-400/20">
+            <i class="fa-solid fa-rainbow"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-white">Spektral Kamalak</div>
+            <div class="text-[10px] text-slate-400">Dispersiya optik kamari</div>
+          </div>
+        </div>
+        <span class="status-indicator w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"></span>
+      </button>
+
+      <button id="toggle-wind" class="disaster-card w-full p-2.5 rounded-2xl border border-white/10 bg-slate-800/40 flex items-center justify-between text-left">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-300 flex items-center justify-center text-base border border-sky-400/20">
+            <i class="fa-solid fa-wind"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-white">Kuchli Shamol & Dovol</div>
+            <div class="text-[10px] text-slate-400">Daraxtlar egilishi va havo oqimi</div>
+          </div>
+        </div>
+        <span class="status-indicator w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"></span>
+      </button>
+
+      <button id="toggle-tornado" class="disaster-card w-full p-2.5 rounded-2xl border border-white/10 bg-slate-800/40 flex items-center justify-between text-left">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-base border border-indigo-400/20">
+            <i class="fa-solid fa-tornado"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-white">Tornado (Girdob)</div>
+            <div class="text-[10px] text-slate-400">Chang ustuni va vayronkor uyurma</div>
+          </div>
+        </div>
+        <span class="status-indicator w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"></span>
+      </button>
+
+      <button id="toggle-tsunami" class="disaster-card w-full p-2.5 rounded-2xl border border-white/10 bg-slate-800/40 flex items-center justify-between text-left">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center text-base border border-cyan-400/20">
+            <i class="fa-solid fa-water"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-white">Chinakim Tsunami</div>
+            <div class="text-[10px] text-slate-400">Ulkan to'lqin devori va suv bosishi</div>
+          </div>
+        </div>
+        <span class="status-indicator w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"></span>
+      </button>
+
+      <button id="toggle-quake" class="disaster-card w-full p-2.5 rounded-2xl border border-white/10 bg-slate-800/40 flex items-center justify-between text-left">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center text-base border border-orange-400/20">
+            <i class="fa-solid fa-house-crack"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-white">Yer Silkinishi (Zilzila)</div>
+            <div class="text-[10px] text-slate-400">Relyef silkinishi va yoriqlar</div>
+          </div>
+        </div>
+        <span class="status-indicator w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"></span>
+      </button>
+
+      <button id="toggle-volcano" class="disaster-card w-full p-2.5 rounded-2xl border border-white/10 bg-slate-800/40 flex items-center justify-between text-left">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-base border border-rose-400/20">
+            <i class="fa-solid fa-volcano"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-white">Vulqon Otilishi</div>
+            <div class="text-[10px] text-slate-400">Kraterdan otiluvchi lava & tutun</div>
+          </div>
+        </div>
+        <span class="status-indicator w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"></span>
+      </button>
+    </div>
+
+    <!-- Actions -->
+    <div class="pt-3 mt-1 border-t border-white/10 flex gap-2">
+      <button id="btn-combo" class="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-red-600 via-orange-600 to-amber-500 hover:brightness-110 text-[11px] font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] transition">
+        <i class="fa-solid fa-meteor mr-1"></i> Apokalipsis
+      </button>
+      <button id="btn-clear" class="py-2.5 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 transition" title="Barchasini to'xtatish">
+        Tinchitish
+      </button>
+    </div>
+  </aside>
+
+  <!-- Notification Toast -->
+  <div id="toast-msg" class="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-5 py-2.5 rounded-2xl ultra-panel border border-cyan-400/40 text-cyan-300 text-xs font-semibold tracking-wide transition-all duration-300 opacity-0 pointer-events-none shadow-2xl flex items-center gap-2">
+    <i class="fa-solid fa-circle-info"></i>
+    <span id="toast-text">Ultra HD Render Tayyor</span>
+  </div>
+
+  <script>
+    class RealisticSoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      }
+      ensure() {
+        this.init();
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      playThunder() {
+        if (!this.enabled) return;
+        this.ensure();
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const dur = 2.8;
+        const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < buf.length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.8));
+
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(380, t);
+        filter.frequency.exponentialRampToValueAtTime(25, t + dur);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(1.0, t);
+        gain.gain.exponentialRampToValueAtTime(0.005, t + dur);
+
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        src.start(t);
+      }
+      playVolcanoExplosion() {
+        if (!this.enabled) return;
+        this.ensure();
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(110, t);
+        osc.frequency.exponentialRampToValueAtTime(18, t + 2.0);
+        gain.gain.setValueAtTime(0.85, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 2.0);
+      }
+      playTsunamiRoar() {
+        if (!this.enabled) return;
+        this.ensure();
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const dur = 3.5;
+        const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < buf.length; i++) data[i] = (Math.random() * 2 - 1);
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(280, t);
+        filter.frequency.linearRampToValueAtTime(520, t + 1.5);
+        filter.frequency.exponentialRampToValueAtTime(120, t + dur);
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.2, t);
+        gain.gain.linearRampToValueAtTime(0.7, t + 1.2);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        src.start(t);
+      }
+      playQuakeRumble() {
+        if (!this.enabled) return;
+        this.ensure();
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(60, t);
+        osc.frequency.linearRampToValueAtTime(28, t + 1.6);
+        gain.gain.setValueAtTime(0.7, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 1.6);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 1.6);
+      }
+    }
+    const audio = new RealisticSoundEngine();
+  </script>
+
+  <script>
+    const canvas = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.FogExp2(0x87ceeb, 0.0045);
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 1500);
+    camera.position.set(90, 58, 110);
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: false, // Handled with FXAA
+      powerPreference: "high-performance",
+      stencil: false,
+      depth: true
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.04;
+    controls.maxPolarAngle = Math.PI / 2 - 0.02;
+    controls.minDistance = 25;
+    controls.maxDistance = 320;
+    controls.target.set(0, 12, 0);
+
+    // Post-Processing Pipeline (Bloom + FXAA)
+    const composer = new THREE.EffectComposer(renderer);
+    const renderPass = new THREE.RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    const bloomPass = new THREE.UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.9,   // Strength
+      0.4,   // Radius
+      0.82   // Threshold
+    );
+    composer.addPass(bloomPass);
+
+    const fxaaPass = new THREE.ShaderPass(THREE.FXAAShader);
+    const pixelRatio = renderer.getPixelRatio();
+    fxaaPass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * pixelRatio);
+    fxaaPass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * pixelRatio);
+    composer.addPass(fxaaPass);
+
+    // Realistic Lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x1e293b, 0.65);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff5e6, 1.8);
+    sunLight.position.set(120, 140, 80);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 450;
+    const sDim = 110;
+    sunLight.shadow.camera.left = -sDim;
+    sunLight.shadow.camera.right = sDim;
+    sunLight.shadow.camera.top = sDim;
+    sunLight.shadow.camera.bottom = -sDim;
+    sunLight.shadow.bias = -0.0004;
+    scene.add(sunLight);
+
+    // Dynamic lightning point light
+    const flashLight = new THREE.PointLight(0xa5f3fc, 0, 500, 1.5);
+    flashLight.position.set(0, 80, 0);
+    scene.add(flashLight);
+  </script>
+
+  <script>
+    // Exact volcano peak center and crater rim parameters
+    const VOLCANO_POS = new THREE.Vector2(-24, -24);
+    const VOLCANO_CRATER_Y = 32.0;
+    const VOLCANO_CRATER_RADIUS = 7.0;
+
+    // Mathematical Ground Height Calculator:
+    // Ensures houses and trees always rest exactly on the surface, never clipping or floating!
+    function getTerrainHeight(x, z) {
+      const distToCenter = Math.hypot(x, z);
+      if (distToCenter > 75) return 0; // In deep ocean
+
+      // Island base curvature: smooth bell shaped island falling into ocean at r=70
+      let h = Math.max(0, 14.0 * Math.cos((distToCenter / 72.0) * (Math.PI / 2)));
+
+      // Natural rolling hills noise
+      h += Math.sin(x * 0.08) * Math.cos(z * 0.08) * 3.2;
+      h += Math.sin(x * 0.18 + 1.2) * Math.cos(z * 0.18 + 0.8) * 1.4;
+
+      // Volcano cone contribution
+      const vDist = Math.hypot(x - VOLCANO_POS.x, z - VOLCANO_POS.y);
+      if (vDist < 34) {
+        if (vDist < VOLCANO_CRATER_RADIUS) {
+          // Inside caldera crater depression
+          const calderaDepth = (1.0 - (vDist / VOLCANO_CRATER_RADIUS)) * 6.5;
+          h += (34 - VOLCANO_CRATER_RADIUS) * 0.85 - calderaDepth;
+        } else {
+          // Steep volcanic cone slope
+          h += (34 - vDist) * 0.85;
+        }
+      }
+
+      return Math.max(1.0, h);
+    }
+
+    const islandGroup = new THREE.Group();
+    scene.add(islandGroup);
+
+    // High density procedural island terrain plane
+    const terrainGeo = new THREE.PlaneGeometry(160, 160, 140, 140);
+    terrainGeo.rotateX(-Math.PI / 2);
+    const posAttr = terrainGeo.attributes.position;
+    const colors = [];
+
+    const colDeepRock = new THREE.Color(0x232220);
+    const colVolcanoAsh = new THREE.Color(0x383533);
+    const colHighGrass = new THREE.Color(0x2d6a4f);
+    const colLushGrass = new THREE.Color(0x40916c);
+    const colSand = new THREE.Color(0xddb892);
+
+    for (let i = 0; i < posAttr.count; i++) {
+      const x = posAttr.getX(i);
+      const z = posAttr.getZ(i);
+      const y = getTerrainHeight(x, z);
+      posAttr.setY(i, y);
+
+      const vDist = Math.hypot(x - VOLCANO_POS.x, z - VOLCANO_POS.y);
+      const distCenter = Math.hypot(x, z);
+
+      if (vDist < 18) {
+        colors.push(colDeepRock.r, colDeepRock.g, colDeepRock.b);
+      } else if (vDist < 32) {
+        colors.push(colVolcanoAsh.r, colVolcanoAsh.g, colVolcanoAsh.b);
+      } else if (distCenter > 56) {
+        colors.push(colSand.r, colSand.g, colSand.b);
+      } else if (y > 14) {
+        colors.push(colHighGrass.r, colHighGrass.g, colHighGrass.b);
+      } else {
+        colors.push(colLushGrass.r, colLushGrass.g, colLushGrass.b);
+      }
+    }
+    terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    terrainGeo.computeVertexNormals();
+
+    const terrainMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.86,
+      metalness: 0.08,
+      flatShading: true
+    });
+    const islandMesh = new THREE.Mesh(terrainGeo, terrainMat);
+    islandMesh.receiveShadow = true;
+    islandMesh.castShadow = true;
+    islandGroup.add(islandMesh);
+
+    // Volcano Glowing Caldera Molten Lake (Resting STRICTLY inside the crater)
+    const calderaLakeGeo = new THREE.CircleGeometry(VOLCANO_CRATER_RADIUS - 0.5, 32);
+    calderaLakeGeo.rotateX(-Math.PI / 2);
+    const calderaLakeMat = new THREE.MeshStandardMaterial({
+      color: 0xff3b00,
+      emissive: 0xff2200,
+      emissiveIntensity: 2.8,
+      roughness: 0.3
+    });
+    const calderaLake = new THREE.Mesh(calderaLakeGeo, calderaLakeMat);
+    calderaLake.position.set(VOLCANO_POS.x, getTerrainHeight(VOLCANO_POS.x, VOLCANO_POS.y) + 0.8, VOLCANO_POS.y);
+    islandGroup.add(calderaLake);
+  </script>
+
+  <script>
+    const villageHouses = [];
+    const islandTrees = [];
+
+    function buildRealisticHouse(x, z, rY) {
+      const house = new THREE.Group();
+      // Exact calculation of ground surface height
+      const groundY = getTerrainHeight(x, z);
+
+      // House foundation and walls
+      const bodyH = 3.6;
+      const bMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7 });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(5.0, bodyH, 5.0), bMat);
+      body.position.y = bodyH / 2; // Position so bottom sits on local y=0
+      body.castShadow = true;
+      body.receiveShadow = true;
+      house.add(body);
+
+      // Stone foundation foot to ensure no gaps on slopes
+      const fMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(5.2, 1.2, 5.2), fMat);
+      foot.position.y = 0.2;
+      foot.castShadow = true;
+      house.add(foot);
+
+      // Gabled Roof
+      const rMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.5 });
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(4.4, 2.6, 4), rMat);
+      roof.position.y = bodyH + 1.3;
+      roof.rotation.y = Math.PI / 4;
+      roof.castShadow = true;
+      house.add(roof);
+
+      // Lit Windows
+      const winMat = new THREE.MeshStandardMaterial({
+        color: 0xfef08a,
+        emissive: 0xeab308,
+        emissiveIntensity: 1.6
+      });
+      const win = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), winMat);
+      win.position.set(0, bodyH * 0.55, 2.52);
+      house.add(win);
+
+      house.position.set(x, groundY, z);
+      house.rotation.y = rY;
+      house.userData = {
+        origY: groundY,
+        origRot: house.rotation.clone(),
+        health: 100,
+        destroyed: false
+      };
+      islandGroup.add(house);
+      villageHouses.push(house);
+    }
+
+    function buildRealisticTree(x, z, scale = 1.0) {
+      const tree = new THREE.Group();
+      const groundY = getTerrainHeight(x, z);
+
+      const trunkH = 3.2;
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.9 });
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.55, trunkH, 7), trunkMat);
+      trunk.position.y = trunkH / 2;
+      trunk.castShadow = true;
+      tree.add(trunk);
+
+      const fMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.8, flatShading: true });
+      for (let i = 0; i < 3; i++) {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(2.4 - i * 0.5, 2.6, 7), fMat);
+        cone.position.y = trunkH + i * 1.4;
+        cone.castShadow = true;
+        tree.add(cone);
+      }
+
+      tree.position.set(x, groundY, z);
+      tree.scale.set(scale, scale, scale);
+      tree.userData = {
+        swayPhase: Math.random() * Math.PI * 2,
+        origRot: tree.rotation.clone()
+      };
+      islandGroup.add(tree);
+      islandTrees.push(tree);
+    }
+
+    // Spawn 14 Village houses across safe flat grassy zones
+    const houseCoords = [
+      [22, 14, 0.3], [28, 22, 0.8], [24, 4, -0.4], [14, 28, 0.6],
+      [32, 12, 1.2], [12, -10, 0.2], [24, -18, -0.5], [34, -6, 0.4],
+      [-2, 28, -0.2], [6, 18, 0.7], [36, 0, 1.5], [18, -28, -0.8],
+      [10, 36, 0.5], [40, 16, 1.1]
+    ];
+    houseCoords.forEach(([hx, hz, hr]) => buildRealisticHouse(hx, hz, hr));
+
+    // Spawn 65 Trees across island biomes
+    for (let i = 0; i < 65; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const r = 12 + Math.random() * 42;
+      const tx = Math.cos(ang) * r;
+      const tz = Math.sin(ang) * r;
+      // Keep trees off the steep volcano crater
+      if (Math.hypot(tx - VOLCANO_POS.x, tz - VOLCANO_POS.y) > 24) {
+        buildRealisticTree(tx, tz, 0.75 + Math.random() * 0.5);
+      }
+    }
+  </script>
+
+  <script>
+    const oceanVertexShader = `
+      uniform float uTime;
+      varying vec2 vUv;
+      varying vec3 vWorldPos;
+      varying vec3 vNormal;
+
+      void main() {
+        vUv = uv;
+        vec3 pos = position;
+        
+        // Gerstner-style ocean wave displacement
+        float w1 = sin(pos.x * 0.08 + uTime * 2.4) * cos(pos.y * 0.08 + uTime * 1.8) * 1.1;
+        float w2 = sin(pos.x * 0.16 - uTime * 1.6 + pos.y * 0.12) * 0.45;
+        pos.z += w1 + w2;
+
+        vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
+        vNormal = normalMatrix * vec3(0.0, 0.0, 1.0);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `;
+
+    const oceanFragmentShader = `
+      uniform float uTime;
+      uniform vec3 uSunDir;
+      uniform vec3 uWaterDeep;
+      uniform vec3 uWaterShallow;
+      varying vec2 vUv;
+      varying vec3 vWorldPos;
+
+      void main() {
+        vec3 viewDir = normalize(cameraPosition - vWorldPos);
+        float ripple = sin(vWorldPos.x * 0.4 + uTime * 3.2) * cos(vWorldPos.z * 0.4 + uTime * 2.8);
+        vec3 normal = normalize(vec3(ripple * 0.14, 1.0, ripple * 0.14));
+
+        // Fresnel reflection
+        float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 3.5);
+
+        // Sun specular glint
+        vec3 halfVec = normalize(uSunDir + viewDir);
+        float spec = pow(max(dot(normal, halfVec), 0.0), 128.0) * 2.2;
+
+        // Sea foam crest
+        float foam = smoothstep(1.0, 1.5, sin(vWorldPos.x * 0.08 + uTime * 2.4) * cos(vWorldPos.z * 0.08 + uTime * 1.8) * 1.4);
+
+        vec3 waterCol = mix(uWaterDeep, uWaterShallow, fresnel * 0.7);
+        waterCol += vec3(spec);
+        waterCol = mix(waterCol, vec3(0.92, 0.97, 1.0), foam * 0.65);
+
+        gl_FragColor = vec4(waterCol, 0.88);
+      }
+    `;
+
+    const oceanGeo = new THREE.PlaneGeometry(700, 700, 128, 128);
+    oceanGeo.rotateX(-Math.PI / 2);
+
+    const oceanUniforms = {
+      uTime: { value: 0 },
+      uSunDir: { value: new THREE.Vector3(0.5, 0.8, 0.3).normalize() },
+      uWaterDeep: { value: new THREE.Color(0x023e8a) },
+      uWaterShallow: { value: new THREE.Color(0x00b4d8) }
+    };
+
+    const oceanMat = new THREE.ShaderMaterial({
+      vertexShader: oceanVertexShader,
+      fragmentShader: oceanFragmentShader,
+      uniforms: oceanUniforms,
+      transparent: true,
+      side: THREE.DoubleSide
+    });
+
+    const oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
+    oceanMesh.position.y = 1.0;
+    scene.add(oceanMesh);
+  </script>
+
+  <script>
+    /* 1. Yomg'ir (Rain System) */
+    const rainCount = 7000;
+    const rainGeo = new THREE.BufferGeometry();
+    const rainPos = new Float32Array(rainCount * 3);
+    const rainSpeeds = new Float32Array(rainCount);
+
+    for (let i = 0; i < rainCount; i++) {
+      rainPos[i * 3] = (Math.random() - 0.5) * 220;
+      rainPos[i * 3 + 1] = Math.random() * 110 + 5;
+      rainPos[i * 3 + 2] = (Math.random() - 0.5) * 220;
+      rainSpeeds[i] = 2.5 + Math.random() * 1.3;
+    }
+    rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+    const rainMat = new THREE.PointsMaterial({
+      color: 0x93c5fd,
+      size: 0.85,
+      transparent: true,
+      opacity: 0.82
+    });
+    const rainSystem = new THREE.Points(rainGeo, rainMat);
+    rainSystem.visible = false;
+    scene.add(rainSystem);
+
+    /* 2. Do'l (Hail System) */
+    const hailCount = 1500;
+    const hailGeo = new THREE.BufferGeometry();
+    const hailPos = new Float32Array(hailCount * 3);
+    const hailSpeeds = new Float32Array(hailCount);
+
+    for (let i = 0; i < hailCount; i++) {
+      hailPos[i * 3] = (Math.random() - 0.5) * 180;
+      hailPos[i * 3 + 1] = Math.random() * 95 + 10;
+      hailPos[i * 3 + 2] = (Math.random() - 0.5) * 180;
+      hailSpeeds[i] = 3.4 + Math.random() * 1.8;
+    }
+    hailGeo.setAttribute('position', new THREE.BufferAttribute(hailPos, 3));
+    const hailMat = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 1.6,
+      transparent: true,
+      opacity: 0.95
+    });
+    const hailSystem = new THREE.Points(hailGeo, hailMat);
+    hailSystem.visible = false;
+    scene.add(hailSystem);
+
+    /* 3. Chaqmoq (Procedural Lightning with Bloom) */
+    let lightningBoltGroup = null;
+    let lightningTimer = 0;
+
+    function buildProceduralLightning(start, end, branchChance = 0.45, depth = 0) {
+      const group = new THREE.Group();
+      const points = [start.clone()];
+      const segments = 16;
+      const deltaVec = end.clone().sub(start).divideScalar(segments);
+
+      for (let i = 1; i < segments; i++) {
+        const next = start.clone().add(deltaVec.clone().multiplyScalar(i));
+        const jitter = (24 - depth * 6) * (Math.random() - 0.5);
+        next.x += jitter;
+        next.z += jitter;
+        points.push(next);
+
+        if (Math.random() < branchChance && depth < 2) {
+          const subEnd = next.clone().add(new THREE.Vector3(
+            (Math.random() - 0.5) * 20,
+            -15 - Math.random() * 10,
+            (Math.random() - 0.5) * 20
+          ));
+          group.add(buildProceduralLightning(next, subEnd, branchChance * 0.4, depth + 1));
+        }
+      }
+      points.push(end.clone());
+
+      const geo = new THREE.BufferGeometry().setFromPoints(points);
+      const mat = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 3 });
+      const mainLine = new THREE.Line(geo, mat);
+      group.add(mainLine);
+      return group;
+    }
+
+    function triggerLightningStrike() {
+      if (lightningBoltGroup) scene.remove(lightningBoltGroup);
+
+      const targetX = (Math.random() - 0.5) * 70;
+      const targetZ = (Math.random() - 0.5) * 70;
+      const groundY = getTerrainHeight(targetX, targetZ);
+      const start = new THREE.Vector3(targetX + (Math.random() - 0.5) * 30, 115, targetZ + (Math.random() - 0.5) * 30);
+      const end = new THREE.Vector3(targetX, groundY, targetZ);
+
+      lightningBoltGroup = buildProceduralLightning(start, end);
+      scene.add(lightningBoltGroup);
+
+      flashLight.position.set(targetX, groundY + 25, targetZ);
+      flashLight.intensity = 26;
+      audio.playThunder();
+      triggerCameraShake(0.85);
+
+      setTimeout(() => {
+        if (lightningBoltGroup) {
+          scene.remove(lightningBoltGroup);
+          lightningBoltGroup = null;
+        }
+        flashLight.intensity = 0;
+      }, 160);
+    }
+
+    /* 4. Kamalak (Spectral Arc) */
+    const rainbowGroup = new THREE.Group();
+    const rainbowColors = [0xff0033, 0xff7700, 0xffea00, 0x00e676, 0x00b0ff, 0x651fff, 0xd500f9];
+    rainbowColors.forEach((hex, i) => {
+      const arcGeo = new THREE.TorusGeometry(80 + i * 1.5, 0.8, 10, 64, Math.PI);
+      const arcMat = new THREE.MeshBasicMaterial({
+        color: hex,
+        transparent: true,
+        opacity: 0.38,
+        depthWrite: false
+      });
+      const arc = new THREE.Mesh(arcGeo, arcMat);
+      rainbowGroup.add(arc);
+    });
+    rainbowGroup.rotation.y = -Math.PI / 4;
+    rainbowGroup.rotation.x = 0.22;
+    rainbowGroup.position.set(-15, 12, -5);
+    rainbowGroup.visible = false;
+    scene.add(rainbowGroup);
+
+    /* 5. Kuchli Shamol (Wind Streaks) */
+    const windTrails = [];
+    const windGroup = new THREE.Group();
+    for (let i = 0; i < 65; i++) {
+      const wGeo = new THREE.CylinderGeometry(0.06, 0.16, 18 + Math.random() * 12, 4);
+      wGeo.rotateZ(Math.PI / 2);
+      const wMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.45 });
+      const line = new THREE.Mesh(wGeo, wMat);
+      line.position.set((Math.random() - 0.5) * 160, 15 + Math.random() * 40, (Math.random() - 0.5) * 160);
+      line.userData = { speed: 2.4 + Math.random() * 2.4 };
+      windGroup.add(line);
+      windTrails.push(line);
+    }
+    windGroup.visible = false;
+    scene.add(windGroup);
+
+    /* 6. Tornado (Multi-Layer Vortex Funnel) */
+    const tornadoGroup = new THREE.Group();
+    tornadoGroup.position.set(12, 14, 12);
+    const tornadoCount = 3500;
+    const tornadoGeo = new THREE.BufferGeometry();
+    const tornadoPos = new Float32Array(tornadoCount * 3);
+
+    for (let i = 0; i < tornadoCount; i++) {
+      const h = Math.random() * 80;
+      const r = (h * 0.34) + Math.random() * 3.5 + 1.5;
+      const a = Math.random() * Math.PI * 2;
+      tornadoPos[i * 3] = Math.cos(a) * r;
+      tornadoPos[i * 3 + 1] = h;
+      tornadoPos[i * 3 + 2] = Math.sin(a) * r;
+    }
+    tornadoGeo.setAttribute('position', new THREE.BufferAttribute(tornadoPos, 3));
+    const tornadoMat = new THREE.PointsMaterial({
+      color: 0x64748b,
+      size: 1.4,
+      transparent: true,
+      opacity: 0.72
+    });
+    const tornadoVortex = new THREE.Points(tornadoGeo, tornadoMat);
+    tornadoGroup.add(tornadoVortex);
+    tornadoGroup.visible = false;
+    scene.add(tornadoGroup);
+
+    /* 7. Chinakim Tsunami (Epic Foaming Tidal Wave Surge & Inundation) */
+    const tsunamiSurgeGroup = new THREE.Group();
+
+    // Curved massive tidal wave wall
+    const waveWallGeo = new THREE.CylinderGeometry(16, 26, 220, 64, 1, true, 0, Math.PI);
+    waveWallGeo.rotateZ(Math.PI / 2);
+    const waveWallMat = new THREE.MeshStandardMaterial({
+      color: 0x0369a1,
+      roughness: 0.2,
+      metalness: 0.2,
+      transparent: true,
+      opacity: 0.92
+    });
+    const waveWallMesh = new THREE.Mesh(waveWallGeo, waveWallMat);
+    waveWallMesh.position.y = 12;
+    tsunamiSurgeGroup.add(waveWallMesh);
+
+    // Dynamic crest foam line
+    const foamCrestGeo = new THREE.CylinderGeometry(2.2, 2.8, 224, 16);
+    foamCrestGeo.rotateZ(Math.PI / 2);
+    const foamCrestMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const foamCrest = new THREE.Mesh(foamCrestGeo, foamCrestMat);
+    foamCrest.position.set(0, 24, 0);
+    tsunamiSurgeGroup.add(foamCrest);
+
+    // Spray particles on top of the crest
+    const sprayCount = 450;
+    const sprayGeo = new THREE.BufferGeometry();
+    const sprayPos = new Float32Array(sprayCount * 3);
+    for (let i = 0; i < sprayCount; i++) {
+      sprayPos[i * 3] = (Math.random() - 0.5) * 220;
+      sprayPos[i * 3 + 1] = 23 + Math.random() * 6;
+      sprayPos[i * 3 + 2] = (Math.random() - 0.5) * 6;
+    }
+    sprayGeo.setAttribute('position', new THREE.BufferAttribute(sprayPos, 3));
+    const sprayMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.8, transparent: true, opacity: 0.8 });
+    const sprayMesh = new THREE.Points(sprayGeo, sprayMat);
+    tsunamiSurgeGroup.add(sprayMesh);
+
+    tsunamiSurgeGroup.position.set(-170, 0, 0);
+    tsunamiSurgeGroup.visible = false;
+    scene.add(tsunamiSurgeGroup);
+
+    /* 8. Yer Silkinishi (Fractures) */
+    const fractureGroup = new THREE.Group();
+    for (let i = 0; i < 20; i++) {
+      const fGeo = new THREE.BoxGeometry(1.4, 0.6, 9 + Math.random() * 9);
+      const fMat = new THREE.MeshBasicMaterial({ color: 0x111827 });
+      const fMesh = new THREE.Mesh(fGeo, fMat);
+      const fx = (Math.random() - 0.5) * 60;
+      const fz = (Math.random() - 0.5) * 60;
+      fMesh.position.set(fx, getTerrainHeight(fx, fz) + 0.1, fz);
+      fMesh.rotation.y = Math.random() * Math.PI;
+      fractureGroup.add(fMesh);
+    }
+    fractureGroup.visible = false;
+    islandGroup.add(fractureGroup);
+
+    /* 9. Vulqon Otilishi (Strictly launches upward from inside caldera crater) */
+    const lavaBombCount = 180;
+    const lavaGroup = new THREE.Group();
+    const lavaBombs = [];
+    const lavaMat = new THREE.MeshStandardMaterial({
+      color: 0xff1e00,
+      emissive: 0xff3b00,
+      emissiveIntensity: 3.5
+    });
+
+    const craterCenterY = getTerrainHeight(VOLCANO_POS.x, VOLCANO_POS.y);
+
+    for (let i = 0; i < lavaBombCount; i++) {
+      const bGeo = new THREE.DodecahedronGeometry(0.7 + Math.random() * 0.7);
+      const bomb = new THREE.Mesh(bGeo, lavaMat);
+      // Bomb originates strictly inside crater pool
+      bomb.position.set(
+        VOLCANO_POS.x + (Math.random() - 0.5) * (VOLCANO_CRATER_RADIUS * 1.2),
+        craterCenterY + 1.0,
+        VOLCANO_POS.y + (Math.random() - 0.5) * (VOLCANO_CRATER_RADIUS * 1.2)
+      );
+      bomb.userData = {
+        vel: new THREE.Vector3(),
+        active: false
+      };
+      bomb.visible = false; // Hidden when idle
+      lavaGroup.add(bomb);
+      lavaBombs.push(bomb);
+    }
+    lavaGroup.visible = false;
+    scene.add(lavaGroup);
+
+    // Billowing Storm Ash Clouds
+    const cloudGroup = new THREE.Group();
+    const cloudMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.95,
+      flatShading: true,
+      transparent: true,
+      opacity: 0.92
+    });
+    for (let i = 0; i < 26; i++) {
+      const cGeo = new THREE.DodecahedronGeometry(8 + Math.random() * 9, 1);
+      const cloud = new THREE.Mesh(cGeo, cloudMat);
+      cloud.position.set((Math.random() - 0.5) * 150, 85 + Math.random() * 15, (Math.random() - 0.5) * 150);
+      cloudGroup.add(cloud);
+    }
+    cloudGroup.visible = false;
+    scene.add(cloudGroup);
+  </script>
+
+  <script>
+    const simState = {
+      rain: false,
+      hail: false,
+      lightning: false,
+      rainbow: false,
+      wind: false,
+      tornado: false,
+      tsunami: false,
+      quake: false,
+      volcano: false,
+      intensity: 1.0,
+      autoRotate: false,
+      islandHealth: 100,
+      shakeTime: 0,
+      shakeStrength: 0,
+      baseOceanY: 1.0
+    };
+
+    function triggerCameraShake(strength = 0.5) {
+      simState.shakeTime = 22;
+      simState.shakeStrength = strength;
+    }
+
+    function showToast(text) {
+      const toast = document.getElementById('toast-msg');
+      const toastText = document.getElementById('toast-text');
+      toastText.textContent = text;
+      toast.classList.remove('opacity-0');
+      toast.classList.add('opacity-100');
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0');
+      }, 2400);
+    }
+
+    function updateHealth(delta) {
+      simState.islandHealth = Math.max(0, Math.min(100, simState.islandHealth + delta));
+      const valEl = document.getElementById('health-val');
+      const barEl = document.getElementById('health-bar');
+      valEl.textContent = Math.round(simState.islandHealth) + '%';
+      barEl.style.width = simState.islandHealth + '%';
+
+      if (simState.islandHealth < 30) {
+        barEl.className = 'bg-gradient-to-r from-red-600 to-rose-500 h-full rounded-full transition-all duration-300 w-full shadow-[0_0_12px_#f43f5e]';
+        valEl.className = 'text-rose-500 font-bold font-mono';
+      } else if (simState.islandHealth < 70) {
+        barEl.className = 'bg-gradient-to-r from-amber-500 to-orange-400 h-full rounded-full transition-all duration-300 w-full shadow-[0_0_12px_#fbbf24]';
+        valEl.className = 'text-amber-400 font-bold font-mono';
+      } else {
+        barEl.className = 'bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 h-full rounded-full transition-all duration-300 w-full shadow-[0_0_12px_#22d3ee]';
+        valEl.className = 'text-cyan-400 font-bold font-mono';
+      }
+    }
+
+    function hookDisasterButton(id, key, label, onToggle) {
+      const btn = document.getElementById(id);
+      btn.addEventListener('click', () => {
+        simState[key] = !simState[key];
+        btn.classList.toggle('active', simState[key]);
+        const dot = btn.querySelector('.status-indicator');
+        if (simState[key]) {
+          dot.classList.remove('bg-slate-600');
+          dot.classList.add('bg-cyan-400', 'shadow-[0_0_8px_#38bdf8]');
+          showToast(label + " faollashtirildi");
+        } else {
+          dot.classList.remove('bg-cyan-400', 'shadow-[0_0_8px_#38bdf8]');
+          dot.classList.add('bg-slate-600');
+          showToast(label + " to'xtatildi");
+        }
+        if (onToggle) onToggle(simState[key]);
+      });
+    }
+
+    hookDisasterButton('toggle-rain', 'rain', "Yomg'ir & Bo'ron", (on) => {
+      rainSystem.visible = on;
+      cloudGroup.visible = on || simState.hail || simState.lightning || simState.volcano;
+    });
+
+    hookDisasterButton('toggle-hail', 'hail', "Do'l Bo'roni", (on) => {
+      hailSystem.visible = on;
+      cloudGroup.visible = on || simState.rain || simState.lightning;
+    });
+
+    hookDisasterButton('toggle-lightning', 'lightning', "Chaqmoq & Guldurak", (on) => {
+      cloudGroup.visible = on || simState.rain || simState.hail;
+      if (on) triggerLightningStrike();
+    });
+
+    hookDisasterButton('toggle-rainbow', 'rainbow', "Spektral Kamalak", (on) => {
+      rainbowGroup.visible = on;
+    });
+
+    hookDisasterButton('toggle-wind', 'wind', "Kuchli Shamol", (on) => {
+      windGroup.visible = on;
+    });
+
+    hookDisasterButton('toggle-tornado', 'tornado', "Tornado (Uyurma)", (on) => {
+      tornadoGroup.visible = on;
+    });
+
+    hookDisasterButton('toggle-tsunami', 'tsunami', "Chinakim Tsunami", (on) => {
+      tsunamiSurgeGroup.visible = on;
+      tsunamiSurgeGroup.position.x = -170;
+      if (on) {
+        audio.playTsunamiRoar();
+        triggerCameraShake(0.8);
+      } else {
+        oceanMesh.position.y = 1.0;
+      }
+    });
+
+    hookDisasterButton('toggle-quake', 'quake', "Yer Silkinishi (Zilzila)", (on) => {
+      fractureGroup.visible = on;
+      if (on) {
+        audio.playQuakeRumble();
+        triggerCameraShake(0.9);
+      }
+    });
+
+    hookDisasterButton('toggle-volcano', 'volcano', "Vulqon Otilishi", (on) => {
+      lavaGroup.visible = on;
+      cloudGroup.visible = on || simState.rain || simState.hail;
+      if (on) {
+        audio.playVolcanoExplosion();
+        triggerCameraShake(0.7);
+      } else {
+        // Reset and hide all lava bombs inside caldera
+        lavaBombs.forEach(b => {
+          b.userData.active = false;
+          b.visible = false;
+        });
+      }
+    });
+
+    // Intensity Slider
+    document.getElementById('intensity-slider').addEventListener('input', (e) => {
+      simState.intensity = parseFloat(e.target.value);
+      document.getElementById('intensity-badge').textContent = simState.intensity.toFixed(1) + 'x';
+    });
+
+    // Cinematic Auto-Rotate Camera Toggle
+    const btnCinematic = document.getElementById('btn-cinematic');
+    btnCinematic.addEventListener('click', () => {
+      simState.autoRotate = !simState.autoRotate;
+      controls.autoRotate = simState.autoRotate;
+      controls.autoRotateSpeed = 1.2;
+      btnCinematic.classList.toggle('bg-cyan-500/20', simState.autoRotate);
+      showToast(simState.autoRotate ? "Kinematik kamera yoqildi" : "Erkin kamera rejimi");
+    });
+
+    // Sky presets
+    const btnDay = document.getElementById('preset-day');
+    const btnSunset = document.getElementById('preset-sunset');
+    const btnNight = document.getElementById('preset-night');
+
+    function resetSkyButtons() {
+      [btnDay, btnSunset, btnNight].forEach(b => {
+        b.className = 'px-2.5 py-1 text-xs rounded-lg text-slate-300 hover:text-white transition';
+      });
+    }
+
+    btnDay.addEventListener('click', () => {
+      resetSkyButtons();
+      btnDay.className = 'px-2.5 py-1 text-xs rounded-lg bg-cyan-500/30 text-cyan-300 font-semibold transition';
+      scene.background.setHex(0x87ceeb);
+      scene.fog.color.setHex(0x87ceeb);
+      sunLight.color.setHex(0xfff5e6);
+      sunLight.intensity = 1.8;
+      hemiLight.intensity = 0.65;
+      renderer.toneMappingExposure = 1.15;
+      bloomPass.strength = 0.9;
+      showToast("Kunduzgi yorug'lik");
+    });
+
+    btnSunset.addEventListener('click', () => {
+      resetSkyButtons();
+      btnSunset.className = 'px-2.5 py-1 text-xs rounded-lg bg-orange-500/30 text-orange-300 font-semibold transition';
+      scene.background.setHex(0xff7733);
+      scene.fog.color.setHex(0xd95d39);
+      sunLight.color.setHex(0xffaa44);
+      sunLight.intensity = 2.2;
+      hemiLight.intensity = 0.5;
+      renderer.toneMappingExposure = 1.25;
+      bloomPass.strength = 1.2;
+      showToast("Oltin Shom ufq rejimi");
+    });
+
+    btnNight.addEventListener('click', () => {
+      resetSkyButtons();
+      btnNight.className = 'px-2.5 py-1 text-xs rounded-lg bg-indigo-500/30 text-indigo-300 font-semibold transition';
+      scene.background.setHex(0x060914);
+      scene.fog.color.setHex(0x060914);
+      sunLight.color.setHex(0x384c7a);
+      sunLight.intensity = 0.35;
+      hemiLight.intensity = 0.2;
+      renderer.toneMappingExposure = 0.95;
+      bloomPass.strength = 1.4;
+      showToast("Tungi kinematik rejim");
+    });
+
+    // Sound toggle
+    const btnAudio = document.getElementById('btn-audio');
+    const audioIcon = document.getElementById('audio-icon');
+    btnAudio.addEventListener('click', () => {
+      audio.enabled = !audio.enabled;
+      if (audio.enabled) {
+        audioIcon.className = 'fa-solid fa-volume-high text-xs';
+        btnAudio.querySelector('span').textContent = 'Ovoz: Yoqiq';
+        showToast("Ovoz yoqildi");
+      } else {
+        audioIcon.className = 'fa-solid fa-volume-xmark text-xs text-slate-400';
+        btnAudio.querySelector('span').textContent = "Ovoz: O'chiq";
+        showToast("Ovoz o'chirildi");
+      }
+    });
+
+    // Apocalypse Combo
+    document.getElementById('btn-combo').addEventListener('click', () => {
+      ['rain', 'lightning', 'wind', 'tornado', 'tsunami', 'volcano', 'quake'].forEach(k => {
+        if (!simState[k]) {
+          const b = document.getElementById('toggle-' + k);
+          if (b) b.click();
+        }
+      });
+      showToast("GLOBAL OFATLAR APOGEYI BOSHLANDI!");
+    });
+
+    // Clear
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      ['rain', 'hail', 'lightning', 'rainbow', 'wind', 'tornado', 'tsunami', 'quake', 'volcano'].forEach(k => {
+        if (simState[k]) {
+          const b = document.getElementById('toggle-' + k);
+          if (b) b.click();
+        }
+      });
+      showToast("Tabiat yana osoyishta holatda");
+    });
+
+    // Reset Island
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      simState.islandHealth = 100;
+      updateHealth(0);
+      villageHouses.forEach(h => {
+        h.position.y = h.userData.origY;
+        h.rotation.copy(h.userData.origRot);
+        h.userData.health = 100;
+        h.userData.destroyed = false;
+        h.visible = true;
+      });
+      islandGroup.position.set(0, 0, 0);
+      tsunamiSurgeGroup.position.x = -170;
+      oceanMesh.position.y = 1.0;
+      showToast("Orol va binolar tiklandi!");
+    });
+  </script>
+
+  <script>
+    const clock = new THREE.Clock();
+
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+      const delta = clock.getDelta();
+      const time = clock.getElapsedTime();
+      const mult = simState.intensity;
+
+      oceanUniforms.uTime.value = time;
+
+      // 1. Rain Physics
+      if (simState.rain) {
+        const rArr = rainGeo.attributes.position.array;
+        for (let i = 0; i < rainCount; i++) {
+          rArr[i * 3 + 1] -= rainSpeeds[i] * 1.8 * mult;
+          if (simState.wind) rArr[i * 3] += 1.2 * mult;
+          if (rArr[i * 3 + 1] < 2) {
+            rArr[i * 3 + 1] = 105 + Math.random() * 10;
+          }
+        }
+        rainGeo.attributes.position.needsUpdate = true;
+      }
+
+      // 2. Hail Physics
+      if (simState.hail) {
+        const hArr = hailGeo.attributes.position.array;
+        for (let i = 0; i < hailCount; i++) {
+          hArr[i * 3 + 1] -= hailSpeeds[i] * 2.2 * mult;
+          if (hArr[i * 3 + 1] <= 8) {
+            hArr[i * 3 + 1] = 95 + Math.random() * 15;
+            if (Math.random() < 0.004 * mult) updateHealth(-0.08);
+          }
+        }
+        hailGeo.attributes.position.needsUpdate = true;
+      }
+
+      // 3. Lightning Interval
+      if (simState.lightning) {
+        lightningTimer += delta * mult;
+        if (lightningTimer > 2.0 + Math.random() * 2.2) {
+          triggerLightningStrike();
+          lightningTimer = 0;
+          updateHealth(-2.5 * mult);
+        }
+      }
+
+      // 4. Wind Physics & Trees Bend
+      if (simState.wind || simState.tornado) {
+        const swayForce = (simState.wind ? 0.38 : 0.2) * mult;
+        islandTrees.forEach(t => {
+          t.rotation.z = Math.sin(time * 7 + t.userData.swayPhase) * swayForce;
+        });
+
+        if (simState.wind) {
+          windTrails.forEach(tr => {
+            tr.position.x += tr.userData.speed * 2.2 * mult;
+            if (tr.position.x > 95) {
+              tr.position.x = -95;
+              tr.position.z = (Math.random() - 0.5) * 160;
+            }
+          });
+        }
+      } else {
+        islandTrees.forEach(t => {
+          t.rotation.z = Math.sin(time * 1.4 + t.userData.swayPhase) * 0.04;
+        });
+      }
+
+      // 5. Tornado Funnel Spin & House Suction
+      if (simState.tornado) {
+        tornadoGroup.rotation.y += 0.28 * mult;
+        tornadoGroup.position.x = Math.sin(time * 0.65) * 32;
+        tornadoGroup.position.z = Math.cos(time * 0.48) * 30;
+
+        villageHouses.forEach(h => {
+          if (!h.userData.destroyed) {
+            const dist = Math.hypot(h.position.x - tornadoGroup.position.x, h.position.z - tornadoGroup.position.z);
+            if (dist < 15) {
+              h.rotation.x += 0.08 * mult;
+              h.rotation.z += 0.06 * mult;
+              h.position.y += 0.22 * mult;
+              h.userData.health -= 1.6 * mult;
+              if (h.userData.health <= 0) {
+                h.userData.destroyed = true;
+                updateHealth(-6);
+              }
+            }
+          }
+        });
+      }
+
+      // 6. Chinakim Tsunami: Massive Wave Rush & Coastal Inundation
+      if (simState.tsunami) {
+        tsunamiSurgeGroup.position.x += 0.85 * mult;
+
+        // Sea level rise (inundation) across the island coast
+        const coastalFlood = Math.sin(time * 2.5) * 2.2 * mult;
+        oceanMesh.position.y = THREE.MathUtils.clamp(1.0 + coastalFlood, 0.5, 6.0);
+
+        // Wave crest splash spray dynamics
+        const spArr = sprayGeo.attributes.position.array;
+        for (let i = 0; i < sprayCount; i++) {
+          spArr[i * 3 + 1] = 23 + Math.sin(time * 8 + i) * 3.5;
+        }
+        sprayGeo.attributes.position.needsUpdate = true;
+
+        if (tsunamiSurgeGroup.position.x > 140) {
+          tsunamiSurgeGroup.position.x = -170;
+          audio.playTsunamiRoar();
+        }
+
+        villageHouses.forEach(h => {
+          if (!h.userData.destroyed && Math.abs(h.position.x - tsunamiSurgeGroup.position.x) < 12) {
+            h.rotation.z = 0.8;
+            h.position.y = Math.max(h.userData.origY - 2.0, h.position.y - 0.4);
+            h.userData.destroyed = true;
+            updateHealth(-7);
+          }
+        });
+      }
+
+      // 7. Earthquake Ground Vibration
+      if (simState.quake) {
+        const shake = (Math.sin(time * 45) * 0.4 + (Math.random() - 0.5) * 0.3) * mult;
+        islandGroup.position.x = shake;
+        islandGroup.position.z = Math.cos(time * 38) * 0.3 * mult;
+        triggerCameraShake(0.35 * mult);
+        updateHealth(-0.2 * mult);
+
+        villageHouses.forEach(h => {
+          if (Math.random() < 0.04 * mult && !h.userData.destroyed) {
+            h.rotation.x += (Math.random() - 0.5) * 0.12;
+            h.rotation.z += (Math.random() - 0.5) * 0.12;
+            h.position.y -= 0.05;
+            if (h.position.y < h.userData.origY - 3.0) h.userData.destroyed = true;
+          }
+        });
+      } else {
+        islandGroup.position.x *= 0.88;
+        islandGroup.position.z *= 0.88;
+      }
+
+      // 8. Vulqon Otilishi: STRICTLY launches upwards from caldera crater lake and falls down
+      if (simState.volcano) {
+        calderaLakeMat.emissiveIntensity = 3.0 + Math.sin(time * 12) * 1.5;
+
+        lavaBombs.forEach(b => {
+          if (!b.userData.active && Math.random() < 0.18 * mult) {
+            b.userData.active = true;
+            b.visible = true;
+            // Spawn strictly inside caldera crater rim
+            const ang = Math.random() * Math.PI * 2;
+            const rad = Math.random() * (VOLCANO_CRATER_RADIUS - 1.2);
+            b.position.set(
+              VOLCANO_POS.x + Math.cos(ang) * rad,
+              craterCenterY + 1.2,
+              VOLCANO_POS.y + Math.sin(ang) * rad
+            );
+            b.userData.vel.set(
+              (Math.random() - 0.5) * 1.8 * mult,
+              (2.4 + Math.random() * 2.8) * mult, // High upward ballistic launch
+              (Math.random() - 0.5) * 1.8 * mult
+            );
+          }
+
+          if (b.userData.active) {
+            b.position.add(b.userData.vel);
+            b.userData.vel.y -= 0.065; // Realistic gravity
+            b.rotation.x += 0.12;
+            b.rotation.y += 0.12;
+
+            // When bomb hits the terrain surface or ocean
+            const groundAtBomb = getTerrainHeight(b.position.x, b.position.z);
+            if (b.position.y <= groundAtBomb + 0.5) {
+              b.userData.active = false;
+              b.visible = false; // Vanishes on impact, never hovers outside
+              if (Math.hypot(b.position.x, b.position.z) < 55) {
+                updateHealth(-0.4 * mult);
+              }
+            }
+          }
+        });
+      }
+
+      // Cloud movement
+      if (cloudGroup.visible) {
+        cloudGroup.rotation.y += 0.0012 * mult;
+      }
+
+      // Camera Shake
+      if (simState.shakeTime > 0) {
+        simState.shakeTime--;
+        camera.position.x += (Math.random() - 0.5) * simState.shakeStrength;
+        camera.position.y += (Math.random() - 0.5) * simState.shakeStrength;
+        camera.position.z += (Math.random() - 0.5) * simState.shakeStrength;
+      }
+
+      controls.update();
+      composer.render();
+    }
+
+    // Window Resize Handler
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+      composer.setSize(w, h);
+      const pr = renderer.getPixelRatio();
+      fxaaPass.material.uniforms['resolution'].value.x = 1 / (w * pr);
+      fxaaPass.material.uniforms['resolution'].value.y = 1 / (h * pr);
+    });
+
+    window.onload = function() {
+      renderLoop();
+    };
+  </script>
+</body>
+</html>
